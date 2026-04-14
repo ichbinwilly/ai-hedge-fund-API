@@ -207,6 +207,10 @@ def run_analysis():
 
         # 執行完整分析
         broadcast_log(f"Starting analysis for {ticker_list}", "info")
+        from src.llm.models import get_model_info
+        model_info = get_model_info(model_name)
+        model_provider = model_info.provider.value if model_info else "OpenAI"
+
         result = run_hedge_fund(
             tickers=ticker_list,
             start_date=start_date,
@@ -215,7 +219,7 @@ def run_analysis():
             show_reasoning=True,
             selected_analysts=selected_analysts,
             model_name=model_name,
-            model_provider="OpenAI",
+            model_provider=model_provider,
             is_crypto=False
         )
 
@@ -242,8 +246,8 @@ def logs(ws):
         websocket_clients.remove(ws)
 
 if __name__ == "__main__":
-    api_thread = threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 6000, "debug": True, "use_reloader": False})
+    api_thread = threading.Thread(target=app.run, kwargs={"host": "0.0.0.0", "port": 9876, "debug": True, "use_reloader": False})
     api_thread.daemon = True
     api_thread.start()
-    print("API Server started on http://localhost:6000")
+    print("API Server started on http://localhost:9876")
     api_thread.join()

@@ -12,7 +12,8 @@ class ModelProvider(str, Enum):
     OPENAI = "OpenAI"
     GROQ = "Groq"
     ANTHROPIC = "Anthropic"
-    GEMINI = "Gemini"  # Add Gemini provider
+    GEMINI = "Gemini"
+    MINIMAX = "MiniMax"
 
 
 class LLMModel(BaseModel):
@@ -82,6 +83,21 @@ AVAILABLE_MODELS = [
         model_name="gemini-2.0-flash",
         provider=ModelProvider.GEMINI
     ),
+    LLMModel(
+        display_name="[minimax] MiniMax-M2.7",
+        model_name="MiniMax-M2.7",
+        provider=ModelProvider.MINIMAX
+    ),
+    LLMModel(
+        display_name="[minimax] MiniMax-M2.5",
+        model_name="MiniMax-M2.5",
+        provider=ModelProvider.MINIMAX
+    ),
+    LLMModel(
+        display_name="[minimax] MiniMax-M2.1",
+        model_name="MiniMax-M2.1",
+        provider=ModelProvider.MINIMAX
+    ),
 ]
 
 # Create LLM_ORDER in the format expected by the UI
@@ -124,4 +140,14 @@ def get_model(model_name: str, model_provider: ModelProvider) -> ChatOpenAI | Ch
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             model=model_name
+        )
+    elif model_provider == ModelProvider.MINIMAX:
+        api_key = os.getenv("MINIMAX_API_KEY")
+        if not api_key:
+            print(f"API Key Error: Please make sure MINIMAX_API_KEY is set in your .env file.")
+            raise ValueError("MiniMax API key not found. Please make sure MINIMAX_API_KEY is set in your .env file.")
+        return ChatOpenAI(
+            model=model_name,
+            api_key=api_key,
+            base_url="https://api.minimax.io/v1"
         )

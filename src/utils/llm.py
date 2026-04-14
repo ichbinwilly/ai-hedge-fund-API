@@ -1,9 +1,14 @@
 """Helper functions for LLM"""
 
 import json
+import time
 from typing import TypeVar, Type, Optional, Any
 from pydantic import BaseModel
 from utils.progress import progress
+
+# Simple rate limiter: track last call time per provider
+_last_call_time = {}
+MINIMAX_CALL_DELAY = 30  # seconds between calls to avoid rate limit
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -36,12 +41,23 @@ def call_llm(
     model_info = get_model_info(model_name)
     llm = get_model(model_name, model_provider)
     
-    # For non-Deepseek models, we can use structured output
-    if not (model_info and model_info.is_deepseek()):
+    # For non-Deepseek and non-MiniMax models, use structured output
+    is_special = model_info and (model_info.is_deepseek() or model_info.provider.value == "MiniMax")
+    if not is_special:
         llm = llm.with_structured_output(
             pydantic_model,
             method="json_mode",
         )
+    
+    # Rate limiting: ensure minimum delay between calls (especially for MiniMax)
+    if model_info and model_info.provider.value == "MiniMax":
+        print("minimax")
+        last = _last_call_time.get("MiniMax", 0)
+        elapsed = time.time() - last
+        if elapsed < MINIMAX_CALL_DELAY:
+            sleep_time = MINIMAX_CALL_DELAY - elapsed
+            time.sleep(sleep_time)
+        _last_call_time["MiniMax"] = time.time()
     
     # Call the LLM with retries
     for attempt in range(max_retries):
@@ -50,7 +66,7 @@ def call_llm(
             result = llm.invoke(prompt)
             
             # For Deepseek, we need to extract and parse the JSON manually
-            if model_info and model_info.is_deepseek():
+            if model_info and model_info.is_deepseek() or model_info.provider.value == "MiniMax":
                 parsed_result = extract_json_from_deepseek_response(result.content)
                 if parsed_result:
                     return pydantic_model(**parsed_result)
@@ -63,6 +79,9 @@ def call_llm(
             
             if attempt == max_retries - 1:
                 print(f"Error in LLM call after {max_retries} attempts: {e}")
+                if model_info and model_info.provider.value == "MiniMax":
+                    # Longer delay after failure to let rate limit recover
+                    time.sleep(5)
                 # Use default_factory if provided, otherwise create a basic default
                 if default_factory:
                     return default_factory()
